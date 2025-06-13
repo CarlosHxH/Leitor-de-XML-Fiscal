@@ -1,0 +1,1181 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leitor de XML Fiscal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .upload-area {
+            padding: 40px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-input-button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 50px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .file-input-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .xml-content {
+            padding: 30px;
+            display: none;
+        }
+
+        .section {
+            background: white;
+            margin-bottom: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            overflow: hidden;
+            transition: transform 0.3s ease;
+        }
+
+        .section:hover {
+            transform: translateY(-2px);
+        }
+
+        .section-header {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            padding: 20px;
+            font-weight: bold;
+            font-size: 1.2em;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header .toggle-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .section-header.collapsed .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .section-content {
+            padding: 25px;
+            background: #f8f9fa;
+        }
+
+        .section-content.collapsed {
+            display: none;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .info-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        .info-label {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .info-value {
+            color: #34495e;
+            font-size: 1.1em;
+            word-break: break-word;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-autorizado {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px;
+            border-left: 4px solid #dc3545;
+        }
+
+        .document-type {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+
+        .type-nfe {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .type-cte {
+            background: #e2e3e5;
+            color: #383d41;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+                border-radius: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .info-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 Leitor de XML Fiscal</h1>
+            <p>Visualize e analise documentos fiscais eletrônicos (NF-e e CT-e)</p>
+        </div>
+        
+        <div class="upload-area">
+            <div class="file-input-wrapper">
+                <input type="file" id="xmlFile" class="file-input" accept=".xml" />
+                <button class="file-input-button" onclick="document.getElementById('xmlFile').click()">
+                    📁 Selecionar Arquivo XML
+                </button>
+            </div>
+            <p style="color: #666; margin-top: 10px;">
+                Selecione um arquivo XML de NF-e ou CT-e para visualizar suas informações
+            </p>
+        </div>
+
+        <div id="xmlContent" class="xml-content">
+            <!-- Conteúdo será gerado dinamicamente -->
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('xmlFile').addEventListener('change', handleFileSelect);
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const xmlContent = e.target.result;
+                    const parser = new DOMParser();
+                    const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
+                    
+                    if (xmlDoc.getElementsByTagName('parsererror').length > 0) {
+                        throw new Error('Erro ao processar o arquivo XML');
+                    }
+                    
+                    // Verificar se é NF-e ou CT-e
+                    if (xmlDoc.getElementsByTagName('nfeProc').length > 0) {
+                        displayNFeInfo(xmlDoc);
+                    } else if (xmlDoc.getElementsByTagName('cteProc').length > 0) {
+                        displayCTeInfo(xmlDoc);
+                    } else {
+                        throw new Error('Documento XML não reconhecido como NF-e ou CT-e');
+                    }
+                } catch (error) {
+                    showError('Erro ao ler o arquivo: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function displayNFeInfo(xmlDoc) {
+            const contentDiv = document.getElementById('xmlContent');
+            contentDiv.style.display = 'block';
+            
+            // Extrair informações principais
+            const nfeInfo = extractNFeInfo(xmlDoc);
+            
+            let html = '<div class="document-type type-nfe">NOTA FISCAL ELETRÔNICA (NF-e)</div>';
+            
+            // Informações Gerais
+            html += createSection('Informações Gerais da NF-e', [
+                { label: 'Chave de Acesso', value: nfeInfo.chave },
+                { label: 'Número', value: nfeInfo.numero },
+                { label: 'Série', value: nfeInfo.serie },
+                { label: 'Data de Emissão', value: formatDateTime(nfeInfo.dataEmissao) },
+                { label: 'Data de Saída/Entrada', value: formatDateTime(nfeInfo.dataSaida) },
+                { label: 'Modelo', value: nfeInfo.modelo },
+                { label: 'CFOP', value: nfeInfo.cfop },
+                { label: 'Natureza da Operação', value: nfeInfo.naturezaOperacao },
+                { label: 'Tipo de Emissão', value: getTipoEmissaoDescription(nfeInfo.tipoEmissao) },
+                { label: 'Tipo de NF', value: getTipoNFDescription(nfeInfo.tipoNF) },
+                { label: 'Finalidade', value: getFinalidadeDescription(nfeInfo.finalidade) },
+                { label: 'Versão do Processo', value: nfeInfo.versaoProcesso }
+            ]);
+
+            // Emitente
+            html += createSection('Dados do Emitente', [
+                { label: 'CNPJ', value: formatCNPJ(nfeInfo.emitente.cnpj) },
+                { label: 'Razão Social', value: nfeInfo.emitente.razaoSocial },
+                { label: 'Endereço', value: nfeInfo.emitente.endereco },
+                { label: 'Telefone', value: formatTelefone(nfeInfo.emitente.telefone) },
+                { label: 'Inscrição Estadual', value: nfeInfo.emitente.inscricaoEstadual },
+                { label: 'Regime Tributário', value: getRegimeTributarioDescription(nfeInfo.emitente.regimeTributario) }
+            ]);
+
+            // Destinatário
+            html += createSection('Dados do Destinatário', [
+                { label: 'CNPJ', value: formatCNPJ(nfeInfo.destinatario.cnpj) },
+                { label: 'Razão Social', value: nfeInfo.destinatario.razaoSocial },
+                { label: 'Endereço', value: nfeInfo.destinatario.endereco },
+                { label: 'Telefone', value: formatTelefone(nfeInfo.destinatario.telefone) },
+                { label: 'Inscrição Estadual', value: nfeInfo.destinatario.inscricaoEstadual }
+            ]);
+
+            // Produtos
+            if (nfeInfo.produtos && nfeInfo.produtos.length > 0) {
+                let produtosHtml = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; margin-top: 15px;">';
+                produtosHtml += '<tr style="background-color: #3498db; color: white;">';
+                produtosHtml += '<th style="padding: 10px; text-align: left;">Código</th>';
+                produtosHtml += '<th style="padding: 10px; text-align: left;">Descrição</th>';
+                produtosHtml += '<th style="padding: 10px; text-align: right;">Quantidade</th>';
+                produtosHtml += '<th style="padding: 10px; text-align: right;">Valor Unitário</th>';
+                produtosHtml += '<th style="padding: 10px; text-align: right;">Valor Total</th>';
+                produtosHtml += '<th style="padding: 10px; text-align: right;">Desconto</th>';
+                produtosHtml += '</tr>';
+                
+                nfeInfo.produtos.forEach(produto => {
+                    produtosHtml += '<tr style="border-bottom: 1px solid #ddd;">';
+                    produtosHtml += `<td style="padding: 10px;">${produto.codigo}</td>`;
+                    produtosHtml += `<td style="padding: 10px;">${produto.descricao}</td>`;
+                    produtosHtml += `<td style="padding: 10px; text-align: right;">${produto.quantidade} ${produto.unidade}</td>`;
+                    produtosHtml += `<td style="padding: 10px; text-align: right;">${formatCurrency(produto.valorUnitario)}</td>`;
+                    produtosHtml += `<td style="padding: 10px; text-align: right;">${formatCurrency(produto.valorTotal)}</td>`;
+                    produtosHtml += `<td style="padding: 10px; text-align: right;">${formatCurrency(produto.desconto)}</td>`;
+                    produtosHtml += '</tr>';
+                    
+                    // Adicionar informações adicionais do produto
+                    if (produto.informacoesAdicionais) {
+                        produtosHtml += `<tr><td colspan="6" style="padding: 10px; font-size: 0.9em; color: #666;">${produto.informacoesAdicionais}</td></tr>`;
+                    }
+                    
+                    // Adicionar informações de lote/rastreamento
+                    if (produto.lote) {
+                        produtosHtml += `<tr><td colspan="6" style="padding: 10px; font-size: 0.9em; color: #666;">`;
+                        produtosHtml += `Lote: ${produto.lote.numero} | Quantidade: ${produto.lote.quantidade} | `;
+                        produtosHtml += `Fab: ${formatDate(produto.lote.dataFabricacao)} | Val: ${formatDate(produto.lote.dataValidade)}`;
+                        produtosHtml += ` | PMC: ${formatCurrency(produto.lote.pmc)}`;
+                        produtosHtml += `</td></tr>`;
+                    }
+                });
+                
+                produtosHtml += '</table></div>';
+                
+                html += createSection('Produtos/Serviços', [
+                    { label: '', value: produtosHtml }
+                ]);
+            }
+
+            // Totais
+            html += createSection('Totais da NF-e', [
+                { label: 'Valor Total dos Produtos', value: formatCurrency(nfeInfo.totais.valorProdutos) },
+                { label: 'Valor do Desconto', value: formatCurrency(nfeInfo.totais.valorDesconto) },
+                { label: 'Valor Total da NF-e', value: formatCurrency(nfeInfo.totais.valorNF) },
+                { label: 'Base de Cálculo ICMS', value: formatCurrency(nfeInfo.totais.baseCalculoICMS) },
+                { label: 'Valor ICMS', value: formatCurrency(nfeInfo.totais.valorICMS) },
+                { label: 'Base de Cálculo ICMS ST', value: formatCurrency(nfeInfo.totais.baseCalculoICMSST) },
+                { label: 'Valor ICMS ST', value: formatCurrency(nfeInfo.totais.valorICMSST) }
+            ]);
+
+            // Transporte
+            if (nfeInfo.transporte) {
+                html += createSection('Informações de Transporte', [
+                    { label: 'Modalidade do Frete', value: getModalidadeFreteDescription(nfeInfo.transporte.modalidadeFrete) },
+                    { label: 'Transportadora', value: nfeInfo.transporte.transportadora },
+                    { label: 'CNPJ', value: formatCNPJ(nfeInfo.transporte.cnpj) },
+                    { label: 'Inscrição Estadual', value: nfeInfo.transporte.inscricaoEstadual },
+                    { label: 'Endereço', value: nfeInfo.transporte.endereco },
+                    { label: 'Município', value: nfeInfo.transporte.municipio },
+                    { label: 'UF', value: nfeInfo.transporte.uf },
+                    { label: 'Volumes', value: nfeInfo.transporte.volumes },
+                    { label: 'Espécie', value: nfeInfo.transporte.especie },
+                    { label: 'Marca', value: nfeInfo.transporte.marca },
+                    { label: 'Peso Bruto', value: nfeInfo.transporte.pesoBruto + ' kg' }
+                ]);
+            }
+
+            // Cobrança
+            if (nfeInfo.cobranca) {
+                let cobrancaHtml = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; margin-top: 15px;">';
+                cobrancaHtml += '<tr style="background-color: #3498db; color: white;">';
+                cobrancaHtml += '<th style="padding: 10px; text-align: left;">Número</th>';
+                cobrancaHtml += '<th style="padding: 10px; text-align: left;">Vencimento</th>';
+                cobrancaHtml += '<th style="padding: 10px; text-align: right;">Valor</th>';
+                cobrancaHtml += '</tr>';
+                
+                cobrancaHtml += '<tr style="border-bottom: 1px solid #ddd;">';
+                cobrancaHtml += `<td style="padding: 10px;">${nfeInfo.cobranca.numeroFatura}</td>`;
+                cobrancaHtml += `<td style="padding: 10px;">-</td>`;
+                cobrancaHtml += `<td style="padding: 10px; text-align: right;">${formatCurrency(nfeInfo.cobranca.valorOriginal)}</td>`;
+                cobrancaHtml += '</tr>';
+                
+                nfeInfo.cobranca.duplicatas.forEach(dup => {
+                    cobrancaHtml += '<tr style="border-bottom: 1px solid #ddd;">';
+                    cobrancaHtml += `<td style="padding: 10px;">${dup.numero}</td>`;
+                    cobrancaHtml += `<td style="padding: 10px;">${formatDate(dup.vencimento)}</td>`;
+                    cobrancaHtml += `<td style="padding: 10px; text-align: right;">${formatCurrency(dup.valor)}</td>`;
+                    cobrancaHtml += '</tr>';
+                });
+                
+                cobrancaHtml += '</table></div>';
+                
+                html += createSection('Cobrança', [
+                    { label: 'Valor Original', value: formatCurrency(nfeInfo.cobranca.valorOriginal) },
+                    { label: 'Valor do Desconto', value: formatCurrency(nfeInfo.cobranca.valorDesconto) },
+                    { label: 'Valor Líquido', value: formatCurrency(nfeInfo.cobranca.valorLiquido) },
+                    { label: 'Duplicatas', value: cobrancaHtml }
+                ]);
+            }
+
+            // Pagamento
+            if (nfeInfo.pagamento) {
+                html += createSection('Pagamento', [
+                    { label: 'Forma de Pagamento', value: getFormaPagamentoDescription(nfeInfo.pagamento.forma) },
+                    { label: 'Valor', value: formatCurrency(nfeInfo.pagamento.valor) },
+                    { label: 'Troco', value: formatCurrency(nfeInfo.pagamento.troco) }
+                ]);
+            }
+
+            // Informações Adicionais
+            if (nfeInfo.informacoesAdicionais) {
+                html += createSection('Informações Adicionais', [
+                    { label: 'Informações ao Fisco', value: nfeInfo.informacoesAdicionais.infoFisco || '-' },
+                    { label: 'Informações Complementares', value: nfeInfo.informacoesComplementares || '-' },
+                    { label: 'Rota', value: nfeInfo.informacoesAdicionais.rota || '-' },
+                    { label: 'Código do Giro', value: nfeInfo.informacoesAdicionais.codigoGiro || '-' },
+                    { label: 'Pedido', value: nfeInfo.informacoesAdicionais.pedido || '-' }
+                ]);
+            }
+
+            // Status
+            if (nfeInfo.protocolo) {
+                const statusClass = nfeInfo.protocolo.status === '100' ? 'status-autorizado' : '';
+                html += createSection('Status do Documento', [
+                    { label: 'Protocolo', value: nfeInfo.protocolo.numero },
+                    { label: 'Data de Autorização', value: formatDateTime(nfeInfo.protocolo.dataAutorizacao) },
+                    { label: 'Status', value: `<span class="status-badge ${statusClass}">${nfeInfo.protocolo.motivo}</span>` }
+                ]);
+            }
+
+            contentDiv.innerHTML = html;
+            addToggleListeners();
+        }
+
+        function displayCTeInfo(xmlDoc) {
+            const contentDiv = document.getElementById('xmlContent');
+            contentDiv.style.display = 'block';
+            
+            // Extrair informações principais
+            const cteInfo = extractCTeInfo(xmlDoc);
+            
+            let html = '<div class="document-type type-cte">CONHECIMENTO DE TRANSPORTE ELETRÔNICO (CT-e)</div>';
+            
+            // Informações Gerais
+            html += createSection('Informações Gerais do CT-e', [
+                { label: 'Chave de Acesso', value: cteInfo.chave },
+                { label: 'Número', value: cteInfo.numero },
+                { label: 'Série', value: cteInfo.serie },
+                { label: 'Data de Emissão', value: formatDateTime(cteInfo.dataEmissao) },
+                { label: 'Modelo', value: cteInfo.modelo },
+                { label: 'CFOP', value: cteInfo.cfop },
+                { label: 'Natureza da Operação', value: cteInfo.naturezaOperacao },
+                { label: 'Tipo de Emissão', value: getTipoEmissaoDescription(cteInfo.tipoEmissao) },
+                { label: 'Modal', value: getModalDescription(cteInfo.modal) },
+                { label: 'Tipo de Serviço', value: getTipoServicoDescription(cteInfo.tipoServico) },
+                { label: 'Município de Envio', value: cteInfo.municipioEnvio },
+                { label: 'UF de Envio', value: cteInfo.ufEnvio },
+                { label: 'Município de Início', value: cteInfo.municipioInicio },
+                { label: 'UF de Início', value: cteInfo.ufInicio },
+                { label: 'Município de Fim', value: cteInfo.municipioFim },
+                { label: 'UF de Fim', value: cteInfo.ufFim },
+                { label: 'Retira', value: getRetiraDescription(cteInfo.retira) },
+                { label: 'Versão do Processo', value: cteInfo.versaoProcesso }
+            ]);
+
+            // Emitente
+            html += createSection('Dados do Emitente', [
+                { label: 'CNPJ', value: formatCNPJ(cteInfo.emitente.cnpj) },
+                { label: 'Razão Social', value: cteInfo.emitente.razaoSocial },
+                { label: 'Nome Fantasia', value: cteInfo.emitente.nomeFantasia },
+                { label: 'Endereço', value: cteInfo.emitente.endereco },
+                { label: 'Telefone', value: formatTelefone(cteInfo.emitente.telefone) },
+                { label: 'Inscrição Estadual', value: cteInfo.emitente.inscricaoEstadual },
+                { label: 'Regime Tributário', value: getRegimeTributarioDescription(cteInfo.emitente.regimeTributario) }
+            ]);
+
+            // Remetente
+            html += createSection('Dados do Remetente', [
+                { label: 'CNPJ', value: formatCNPJ(cteInfo.remetente.cnpj) },
+                { label: 'Razão Social', value: cteInfo.remetente.razaoSocial },
+                { label: 'Nome Fantasia', value: cteInfo.remetente.nomeFantasia },
+                { label: 'Endereço', value: cteInfo.remetente.endereco },
+                { label: 'Telefone', value: formatTelefone(cteInfo.remetente.telefone) },
+                { label: 'País', value: cteInfo.remetente.pais }
+            ]);
+
+            // Destinatário
+            html += createSection('Dados do Destinatário', [
+                { label: 'CNPJ', value: formatCNPJ(cteInfo.destinatario.cnpj) },
+                { label: 'Razão Social', value: cteInfo.destinatario.razaoSocial },
+                { label: 'Endereço', value: cteInfo.destinatario.endereco },
+                { label: 'Telefone', value: formatTelefone(cteInfo.destinatario.telefone) },
+                { label: 'E-mail', value: cteInfo.destinatario.email },
+                { label: 'País', value: cteInfo.destinatario.pais }
+            ]);
+
+            // Valores
+            html += createSection('Valores do Transporte', [
+                { label: 'Valor Total da Prestação', value: formatCurrency(cteInfo.valores.valorTotal) },
+                { label: 'Valor a Receber', value: formatCurrency(cteInfo.valores.valorReceber) },
+                { label: 'Componentes', value: formatCurrency(cteInfo.valores.componentes) },
+                { label: 'Base de Cálculo ICMS', value: formatCurrency(cteInfo.valores.baseCalculoICMS) },
+                { label: 'Alíquota ICMS', value: cteInfo.valores.aliquotaICMS + '%' },
+                { label: 'Valor ICMS', value: formatCurrency(cteInfo.valores.valorICMS) },
+                { label: 'Valor Total dos Tributos', value: formatCurrency(cteInfo.valores.valorTotalTributos) }
+            ]);
+
+            // Carga
+            if (cteInfo.carga) {
+                html += createSection('Informações da Carga', [
+                    { label: 'Valor da Carga', value: formatCurrency(cteInfo.carga.valor) },
+                    { label: 'Produto Predominante', value: cteInfo.carga.produto },
+                    { label: 'Outras Características', value: cteInfo.carga.outrasCaracteristicas },
+                    { label: 'Valor Averbado', value: formatCurrency(cteInfo.carga.valorAverbado) },
+                    { label: 'Peso Bruto', value: cteInfo.carga.pesoBruto + ' kg' },
+                    { label: 'Volumes', value: cteInfo.carga.volumes }
+                ]);
+            }
+
+            // Documentos Relacionados (NF-e)
+            if (cteInfo.documentos && cteInfo.documentos.length > 0) {
+                let docsHtml = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; margin-top: 15px;">';
+                docsHtml += '<tr style="background-color: #3498db; color: white;">';
+                docsHtml += '<th style="padding: 10px; text-align: left;">Chave NF-e</th>';
+                docsHtml += '</tr>';
+                
+                cteInfo.documentos.forEach(doc => {
+                    docsHtml += '<tr style="border-bottom: 1px solid #ddd;">';
+                    docsHtml += `<td style="padding: 10px;">${doc.chave}</td>`;
+                    docsHtml += '</tr>';
+                });
+                
+                docsHtml += '</table></div>';
+                
+                html += createSection('Documentos Relacionados (NF-e)', [
+                    { label: '', value: docsHtml }
+                ]);
+            }
+
+            // Informações Complementares
+            if (cteInfo.informacoesComplementares) {
+                html += createSection('Informações Complementares', [
+                    { label: 'Observações', value: cteInfo.informacoesComplementares.observacoes },
+                    { label: 'Responsável pelo Seguro', value: cteInfo.informacoesComplementares.responsavelSeguro },
+                    { label: 'Placa do Veículo', value: cteInfo.informacoesComplementares.placa },
+                    { label: 'RNTRC', value: cteInfo.informacoesComplementares.rntrc }
+                ]);
+            }
+
+            // Responsável Técnico
+            if (cteInfo.responsavelTecnico) {
+                html += createSection('Responsável Técnico', [
+                    { label: 'CNPJ', value: formatCNPJ(cteInfo.responsavelTecnico.cnpj) },
+                    { label: 'Nome', value: cteInfo.responsavelTecnico.nome },
+                    { label: 'E-mail', value: cteInfo.responsavelTecnico.email },
+                    { label: 'Telefone', value: formatTelefone(cteInfo.responsavelTecnico.telefone) }
+                ]);
+            }
+
+            // Status
+            if (cteInfo.protocolo) {
+                const statusClass = cteInfo.protocolo.status === '100' ? 'status-autorizado' : '';
+                html += createSection('Status do Documento', [
+                    { label: 'Protocolo', value: cteInfo.protocolo.numero },
+                    { label: 'Data de Autorização', value: formatDateTime(cteInfo.protocolo.dataAutorizacao) },
+                    { label: 'Status', value: `<span class="status-badge ${statusClass}">${cteInfo.protocolo.motivo}</span>` }
+                ]);
+            }
+
+            // QR Code
+            if (cteInfo.qrCode) {
+                html += createSection('QR Code', [
+                    { label: 'URL', value: `<a href="${cteInfo.qrCode}" target="_blank">${cteInfo.qrCode}</a>` }
+                ]);
+            }
+
+            contentDiv.innerHTML = html;
+            addToggleListeners();
+        }
+
+        function extractNFeInfo(xmlDoc) {
+            const ns = "http://www.portalfiscal.inf.br/nfe";
+            const infNFe = xmlDoc.getElementsByTagNameNS(ns, 'infNFe')[0];
+            const ide = xmlDoc.getElementsByTagNameNS(ns, 'ide')[0];
+            const emit = xmlDoc.getElementsByTagNameNS(ns, 'emit')[0];
+            const dest = xmlDoc.getElementsByTagNameNS(ns, 'dest')[0];
+            const dets = xmlDoc.getElementsByTagNameNS(ns, 'det');
+            const total = xmlDoc.getElementsByTagNameNS(ns, 'total')[0];
+            const transp = xmlDoc.getElementsByTagNameNS(ns, 'transp')[0];
+            const cobr = xmlDoc.getElementsByTagNameNS(ns, 'cobr')[0];
+            const pag = xmlDoc.getElementsByTagNameNS(ns, 'pag')[0];
+            const infAdic = xmlDoc.getElementsByTagNameNS(ns, 'infAdic')[0];
+            const protNFe = xmlDoc.getElementsByTagNameNS(ns, 'protNFe')[0];
+
+            // Extrair produtos
+            const produtos = [];
+            for (let det of dets) {
+                const prod = det.getElementsByTagNameNS(ns, 'prod')[0];
+                const imposto = det.getElementsByTagNameNS(ns, 'imposto')[0];
+                const rastro = det.getElementsByTagNameNS(ns, 'rastro')[0];
+                const med = det.getElementsByTagNameNS(ns, 'med')[0];
+                const infAdProd = det.getElementsByTagNameNS(ns, 'infAdProd')[0];
+
+                let loteInfo = null;
+                if (rastro) {
+                    loteInfo = {
+                        numero: getTextContentNS(rastro, ns, 'nLote'),
+                        quantidade: getTextContentNS(rastro, ns, 'qLote'),
+                        dataFabricacao: getTextContentNS(rastro, ns, 'dFab'),
+                        dataValidade: getTextContentNS(rastro, ns, 'dVal'),
+                        pmc: med ? getTextContentNS(med, ns, 'vPMC') : null
+                    };
+                }
+
+                produtos.push({
+                    codigo: getTextContentNS(prod, ns, 'cProd'),
+                    descricao: getTextContentNS(prod, ns, 'xProd'),
+                    ncm: getTextContentNS(prod, ns, 'NCM'),
+                    cest: getTextContentNS(prod, ns, 'CEST'),
+                    cfop: getTextContentNS(prod, ns, 'CFOP'),
+                    unidade: getTextContentNS(prod, ns, 'uCom'),
+                    quantidade: getTextContentNS(prod, ns, 'qCom'),
+                    valorUnitario: getTextContentNS(prod, ns, 'vUnCom'),
+                    valorTotal: getTextContentNS(prod, ns, 'vProd'),
+                    desconto: getTextContentNS(prod, ns, 'vDesc'),
+                    informacoesAdicionais: infAdProd ? infAdProd.textContent : null,
+                    lote: loteInfo
+                });
+            }
+
+            // Extrair duplicatas
+            const duplicatas = [];
+            if (cobr) {
+                const dups = cobr.getElementsByTagNameNS(ns, 'dup');
+                for (let dup of dups) {
+                    duplicatas.push({
+                        numero: getTextContentNS(dup, ns, 'nDup'),
+                        vencimento: getTextContentNS(dup, ns, 'dVenc'),
+                        valor: getTextContentNS(dup, ns, 'vDup')
+                    });
+                }
+            }
+
+            // Extrair informações adicionais
+            let infoAdic = {};
+            if (infAdic) {
+                const obsConts = infAdic.getElementsByTagNameNS(ns, 'obsCont');
+                for (let obs of obsConts) {
+                    const campo = obs.getAttribute('xCampo');
+                    const texto = getTextContentNS(obs, ns, 'xTexto');
+                    if (campo === 'ROTA') infoAdic.rota = texto;
+                    if (campo === 'CODIGO_DO_GIRO') infoAdic.codigoGiro = texto;
+                    if (campo === 'vanPedido') infoAdic.vanPedido = texto;
+                    if (campo === 'loginPedido') infoAdic.loginPedido = texto;
+                }
+                
+                const compra = infAdic.getElementsByTagNameNS(ns, 'compra')[0];
+                if (compra) {
+                    infoAdic.pedido = getTextContentNS(compra, ns, 'xPed');
+                }
+            }
+
+            return {
+                chave: infNFe.getAttribute('Id').replace('NFe', ''),
+                numero: getTextContentNS(ide, ns, 'nNF'),
+                serie: getTextContentNS(ide, ns, 'serie'),
+                dataEmissao: getTextContentNS(ide, ns, 'dhEmi'),
+                dataSaida: getTextContentNS(ide, ns, 'dhSaiEnt'),
+                modelo: getTextContentNS(ide, ns, 'mod'),
+                cfop: getTextContentNS(ide, ns, 'CFOP'),
+                naturezaOperacao: getTextContentNS(ide, ns, 'natOp'),
+                tipoEmissao: getTextContentNS(ide, ns, 'tpEmis'),
+                tipoNF: getTextContentNS(ide, ns, 'tpNF'),
+                finalidade: getTextContentNS(ide, ns, 'finNFe'),
+                versaoProcesso: getTextContentNS(ide, ns, 'verProc'),
+                emitente: {
+                    cnpj: getTextContentNS(emit, ns, 'CNPJ'),
+                    razaoSocial: getTextContentNS(emit, ns, 'xNome'),
+                    endereco: extractEnderecoNS(emit, ns, 'enderEmit'),
+                    telefone: getTextContentNS(emit, ns, 'fone'),
+                    inscricaoEstadual: getTextContentNS(emit, ns, 'IE'),
+                    regimeTributario: getTextContentNS(emit, ns, 'CRT')
+                },
+                destinatario: {
+                    cnpj: getTextContentNS(dest, ns, 'CNPJ'),
+                    razaoSocial: getTextContentNS(dest, ns, 'xNome'),
+                    endereco: extractEnderecoNS(dest, ns, 'enderDest'),
+                    telefone: getTextContentNS(dest, ns, 'fone'),
+                    inscricaoEstadual: getTextContentNS(dest, ns, 'IE')
+                },
+                produtos: produtos,
+                totais: {
+                    valorProdutos: getTextContentNS(total.getElementsByTagNameNS(ns, 'ICMSTot')[0], ns, 'vProd'),
+                    valorDesconto: getTextContentNS(total.getElementsByTagNameNS(ns, 'ICMSTot')[0], ns, 'vDesc'),
+                    valorNF: getTextContentNS(total.getElementsByTagNameNS(ns, 'ICMSTot')[0], ns, 'vNF'),
+                    baseCalculoICMS: getTextContentNS(total.getElementsByTagNameNS(ns, 'ICMSTot')[0], ns, 'vBC'),
+                    valorICMS: getTextContentNS(total.getElementsByTagNameNS(ns, 'ICMSTot')[0], ns, 'vICMS'),
+                    baseCalculoICMSST: getTextContentNS(total.getElementsByTagNameNS(ns, 'ICMSTot')[0], ns, 'vBCST'),
+                    valorICMSST: getTextContentNS(total.getElementsByTagNameNS(ns, 'ICMSTot')[0], ns, 'vST')
+                },
+                transporte: transp ? {
+                    modalidadeFrete: getTextContentNS(transp, ns, 'modFrete'),
+                    transportadora: getTextContentNS(transp.getElementsByTagNameNS(ns, 'transporta')[0], ns, 'xNome'),
+                    cnpj: getTextContentNS(transp.getElementsByTagNameNS(ns, 'transporta')[0], ns, 'CNPJ'),
+                    inscricaoEstadual: getTextContentNS(transp.getElementsByTagNameNS(ns, 'transporta')[0], ns, 'IE'),
+                    endereco: getTextContentNS(transp.getElementsByTagNameNS(ns, 'transporta')[0], ns, 'xEnder'),
+                    municipio: getTextContentNS(transp.getElementsByTagNameNS(ns, 'transporta')[0], ns, 'xMun'),
+                    uf: getTextContentNS(transp.getElementsByTagNameNS(ns, 'transporta')[0], ns, 'UF'),
+                    volumes: getTextContentNS(transp.getElementsByTagNameNS(ns, 'vol')[0], ns, 'qVol'),
+                    especie: getTextContentNS(transp.getElementsByTagNameNS(ns, 'vol')[0], ns, 'esp'),
+                    marca: getTextContentNS(transp.getElementsByTagNameNS(ns, 'vol')[0], ns, 'marca'),
+                    pesoBruto: getTextContentNS(transp.getElementsByTagNameNS(ns, 'vol')[0], ns, 'pesoB')
+                } : null,
+                cobranca: cobr ? {
+                    numeroFatura: getTextContentNS(cobr.getElementsByTagNameNS(ns, 'fat')[0], ns, 'nFat'),
+                    valorOriginal: getTextContentNS(cobr.getElementsByTagNameNS(ns, 'fat')[0], ns, 'vOrig'),
+                    valorDesconto: getTextContentNS(cobr.getElementsByTagNameNS(ns, 'fat')[0], ns, 'vDesc'),
+                    valorLiquido: getTextContentNS(cobr.getElementsByTagNameNS(ns, 'fat')[0], ns, 'vLiq'),
+                    duplicatas: duplicatas
+                } : null,
+                pagamento: pag ? {
+                    forma: getTextContentNS(pag.getElementsByTagNameNS(ns, 'detPag')[0], ns, 'tPag'),
+                    valor: getTextContentNS(pag.getElementsByTagNameNS(ns, 'detPag')[0], ns, 'vPag'),
+                    troco: getTextContentNS(pag, ns, 'vTroco')
+                } : null,
+                informacoesAdicionais: infoAdic,
+                protocolo: protNFe ? {
+                    numero: getTextContentNS(protNFe.getElementsByTagNameNS(ns, 'infProt')[0], ns, 'nProt'),
+                    dataAutorizacao: getTextContentNS(protNFe.getElementsByTagNameNS(ns, 'infProt')[0], ns, 'dhRecbto'),
+                    status: getTextContentNS(protNFe.getElementsByTagNameNS(ns, 'infProt')[0], ns, 'cStat'),
+                    motivo: getTextContentNS(protNFe.getElementsByTagNameNS(ns, 'infProt')[0], ns, 'xMotivo')
+                } : null
+            };
+        }
+
+        function extractCTeInfo(xmlDoc) {
+            const ns = "http://www.portalfiscal.inf.br/cte";
+            const infCte = xmlDoc.getElementsByTagNameNS(ns, 'infCte')[0];
+            const ide = xmlDoc.getElementsByTagNameNS(ns, 'ide')[0];
+            const compl = xmlDoc.getElementsByTagNameNS(ns, 'compl')[0];
+            const emit = xmlDoc.getElementsByTagNameNS(ns, 'emit')[0];
+            const rem = xmlDoc.getElementsByTagNameNS(ns, 'rem')[0];
+            const dest = xmlDoc.getElementsByTagNameNS(ns, 'dest')[0];
+            const vPrest = xmlDoc.getElementsByTagNameNS(ns, 'vPrest')[0];
+            const imp = xmlDoc.getElementsByTagNameNS(ns, 'imp')[0];
+            const infCarga = xmlDoc.getElementsByTagNameNS(ns, 'infCarga')[0];
+            const infDoc = xmlDoc.getElementsByTagNameNS(ns, 'infDoc')[0];
+            const infRespTec = xmlDoc.getElementsByTagNameNS(ns, 'infRespTec')[0];
+            const infCTeSupl = xmlDoc.getElementsByTagNameNS(ns, 'infCTeSupl')[0];
+            const protCTe = xmlDoc.getElementsByTagNameNS(ns, 'protCTe')[0];
+
+            // Extrair documentos relacionados (NF-e)
+            const documentos = [];
+            if (infDoc) {
+                const infNFes = infDoc.getElementsByTagNameNS(ns, 'infNFe');
+                for (let infNFe of infNFes) {
+                    documentos.push({
+                        chave: getTextContentNS(infNFe, ns, 'chave')
+                    });
+                }
+            }
+
+            // Extrair informações complementares
+            let infoComplementares = {};
+            if (compl) {
+                infoComplementares.observacoes = getTextContentNS(compl, ns, 'xObs');
+                
+                const obsConts = compl.getElementsByTagNameNS(ns, 'ObsCont');
+                for (let obs of obsConts) {
+                    const campo = obs.getAttribute('xCampo');
+                    const texto = getTextContentNS(obs, ns, 'xTexto');
+                    if (campo === 'RESPSEG') infoComplementares.responsavelSeguro = texto;
+                    if (campo === 'PLACA') infoComplementares.placa = texto;
+                }
+                
+                const rodo = xmlDoc.getElementsByTagNameNS(ns, 'rodo')[0];
+                if (rodo) {
+                    infoComplementares.rntrc = getTextContentNS(rodo, ns, 'RNTRC');
+                }
+            }
+
+            // Extrair informações da carga
+            let cargaInfo = null;
+            if (infCarga) {
+                const infQs = infCarga.getElementsByTagNameNS(ns, 'infQ');
+                let pesoBruto = '';
+                let volumes = '';
+                
+                for (let infQ of infQs) {
+                    const tipoMedicao = getTextContentNS(infQ, ns, 'tpMed');
+                    if (tipoMedicao === 'PESO BRUTO') {
+                        pesoBruto = getTextContentNS(infQ, ns, 'qCarga');
+                    } else if (tipoMedicao === 'CAIXAS') {
+                        volumes = getTextContentNS(infQ, ns, 'qCarga');
+                    }
+                }
+                
+                cargaInfo = {
+                    valor: getTextContentNS(infCarga, ns, 'vCarga'),
+                    produto: getTextContentNS(infCarga, ns, 'proPred'),
+                    outrasCaracteristicas: getTextContentNS(infCarga, ns, 'xOutCat'),
+                    valorAverbado: getTextContentNS(infCarga, ns, 'vCargaAverb'),
+                    pesoBruto: pesoBruto,
+                    volumes: volumes
+                };
+            }
+
+            // Extrair responsável técnico
+            let responsavelTecnico = null;
+            if (infRespTec) {
+                responsavelTecnico = {
+                    cnpj: getTextContentNS(infRespTec, ns, 'CNPJ'),
+                    nome: getTextContentNS(infRespTec, ns, 'xContato'),
+                    email: getTextContentNS(infRespTec, ns, 'email'),
+                    telefone: getTextContentNS(infRespTec, ns, 'fone')
+                };
+            }
+
+            // Extrair QR Code
+            let qrCode = null;
+            if (infCTeSupl) {
+                const qrCodCTe = infCTeSupl.getElementsByTagNameNS(ns, 'qrCodCTe')[0];
+                if (qrCodCTe) {
+                    qrCode = qrCodCTe.textContent;
+                }
+            }
+
+            return {
+                chave: infCte.getAttribute('Id').replace('CTe', ''),
+                numero: getTextContentNS(ide, ns, 'nCT'),
+                serie: getTextContentNS(ide, ns, 'serie'),
+                dataEmissao: getTextContentNS(ide, ns, 'dhEmi'),
+                modelo: getTextContentNS(ide, ns, 'mod'),
+                cfop: getTextContentNS(ide, ns, 'CFOP'),
+                naturezaOperacao: getTextContentNS(ide, ns, 'natOp'),
+                tipoEmissao: getTextContentNS(ide, ns, 'tpEmis'),
+                modal: getTextContentNS(ide, ns, 'modal'),
+                tipoServico: getTextContentNS(ide, ns, 'tpServ'),
+                municipioEnvio: getTextContentNS(ide, ns, 'xMunEnv'),
+                ufEnvio: getTextContentNS(ide, ns, 'UFEnv'),
+                municipioInicio: getTextContentNS(ide, ns, 'xMunIni'),
+                ufInicio: getTextContentNS(ide, ns, 'UFIni'),
+                municipioFim: getTextContentNS(ide, ns, 'xMunFim'),
+                ufFim: getTextContentNS(ide, ns, 'UFFim'),
+                retira: getTextContentNS(ide, ns, 'retira'),
+                versaoProcesso: getTextContentNS(ide, ns, 'verProc'),
+                emitente: {
+                    cnpj: getTextContentNS(emit, ns, 'CNPJ'),
+                    razaoSocial: getTextContentNS(emit, ns, 'xNome'),
+                    nomeFantasia: getTextContentNS(emit, ns, 'xFant'),
+                    endereco: extractEnderecoNS(emit, ns, 'enderEmit'),
+                    telefone: getTextContentNS(emit, ns, 'fone'),
+                    inscricaoEstadual: getTextContentNS(emit, ns, 'IE'),
+                    regimeTributario: getTextContentNS(emit, ns, 'CRT')
+                },
+                remetente: {
+                    cnpj: getTextContentNS(rem, ns, 'CNPJ'),
+                    razaoSocial: getTextContentNS(rem, ns, 'xNome'),
+                    nomeFantasia: getTextContentNS(rem, ns, 'xFant'),
+                    endereco: extractEnderecoNS(rem, ns, 'enderReme'),
+                    telefone: getTextContentNS(rem, ns, 'fone'),
+                    pais: getTextContentNS(rem.getElementsByTagNameNS(ns, 'enderReme')[0], ns, 'xPais')
+                },
+                destinatario: {
+                    cnpj: getTextContentNS(dest, ns, 'CNPJ'),
+                    razaoSocial: getTextContentNS(dest, ns, 'xNome'),
+                    endereco: extractEnderecoNS(dest, ns, 'enderDest'),
+                    telefone: getTextContentNS(dest, ns, 'fone'),
+                    email: getTextContentNS(dest, ns, 'email'),
+                    pais: getTextContentNS(dest.getElementsByTagNameNS(ns, 'enderDest')[0], ns, 'xPais')
+                },
+                valores: {
+                    valorTotal: getTextContentNS(vPrest, ns, 'vTPrest'),
+                    valorReceber: getTextContentNS(vPrest, ns, 'vRec'),
+                    componentes: getTextContentNS(vPrest.getElementsByTagNameNS(ns, 'Comp')[0], ns, 'vComp'),
+                    baseCalculoICMS: getTextContentNS(imp.getElementsByTagNameNS(ns, 'ICMS00')[0], ns, 'vBC'),
+                    aliquotaICMS: getTextContentNS(imp.getElementsByTagNameNS(ns, 'ICMS00')[0], ns, 'pICMS'),
+                    valorICMS: getTextContentNS(imp.getElementsByTagNameNS(ns, 'ICMS00')[0], ns, 'vICMS'),
+                    valorTotalTributos: getTextContentNS(imp, ns, 'vTotTrib')
+                },
+                carga: cargaInfo,
+                documentos: documentos,
+                informacoesComplementares: infoComplementares,
+                responsavelTecnico: responsavelTecnico,
+                qrCode: qrCode,
+                protocolo: protCTe ? {
+                    numero: getTextContentNS(protCTe.getElementsByTagNameNS(ns, 'infProt')[0], ns, 'nProt'),
+                    dataAutorizacao: getTextContentNS(protCTe.getElementsByTagNameNS(ns, 'infProt')[0], ns, 'dhRecbto'),
+                    status: getTextContentNS(protCTe.getElementsByTagNameNS(ns, 'infProt')[0], ns, 'cStat'),
+                    motivo: getTextContentNS(protCTe.getElementsByTagNameNS(ns, 'infProt')[0], ns, 'xMotivo')
+                } : null
+            };
+        }
+
+        function getTextContentNS(parent, ns, tagName) {
+            if (!parent) return '';
+            const elements = parent.getElementsByTagNameNS(ns, tagName);
+            return elements.length > 0 ? elements[0].textContent : '';
+        }
+
+        function extractEnderecoNS(parent, ns, enderecoTag) {
+            if (!parent) return '';
+            const endereco = parent.getElementsByTagNameNS(ns, enderecoTag)[0];
+            if (!endereco) return '';
+
+            const logradouro = getTextContentNS(endereco, ns, 'xLgr');
+            const numero = getTextContentNS(endereco, ns, 'nro');
+            const complemento = getTextContentNS(endereco, ns, 'xCpl');
+            const bairro = getTextContentNS(endereco, ns, 'xBairro');
+            const municipio = getTextContentNS(endereco, ns, 'xMun');
+            const uf = getTextContentNS(endereco, ns, 'UF');
+            const cep = getTextContentNS(endereco, ns, 'CEP');
+
+            let enderecoCompleto = logradouro;
+            if (numero) enderecoCompleto += ', ' + numero;
+            if (complemento) enderecoCompleto += ' - ' + complemento;
+            if (bairro) enderecoCompleto += ', ' + bairro;
+            if (municipio) enderecoCompleto += ', ' + municipio;
+            if (uf) enderecoCompleto += '/' + uf;
+            if (cep) enderecoCompleto += ' - CEP: ' + formatCEP(cep);
+
+            return enderecoCompleto;
+        }
+
+        function createSection(title, items) {
+            let html = `
+                <div class="section">
+                    <div class="section-header" onclick="toggleSection(this)">
+                        ${title}
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="section-content">
+                        <div class="info-grid">
+            `;
+
+            items.forEach(item => {
+                if (item.value) {
+                    html += `
+                        <div class="info-item">
+                            <div class="info-label">${item.label}</div>
+                            <div class="info-value">${item.value}</div>
+                        </div>
+                    `;
+                }
+            });
+
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            return html;
+        }
+
+        function toggleSection(header) {
+            const content = header.nextElementSibling;
+            const icon = header.querySelector('.toggle-icon');
+            
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                header.classList.remove('collapsed');
+            } else {
+                content.classList.add('collapsed');
+                header.classList.add('collapsed');
+            }
+        }
+
+        function addToggleListeners() {
+            // Os listeners são adicionados via onclick inline
+        }
+
+        // Funções de formatação
+        function formatCNPJ(cnpj) {
+            if (!cnpj) return '';
+            return cnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+        }
+
+        function formatCPF(cpf) {
+            if (!cpf) return '';
+            return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+        }
+
+        function formatCEP(cep) {
+            if (!cep) return '';
+            return cep.replace(/(\d{5})(\d{3})/, '$1-$2');
+        }
+
+        function formatTelefone(telefone) {
+            if (!telefone) return '';
+            if (telefone.length === 11) {
+                return telefone.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+            } else if (telefone.length === 10) {
+                return telefone.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+            }
+            return telefone;
+        }
+
+        function formatCurrency(value) {
+            if (!value) return '';
+            const num = parseFloat(value);
+            return new Intl.NumberFormat('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            }).format(num);
+        }
+
+        function formatDateTime(dateTime) {
+            if (!dateTime) return '';
+            const date = new Date(dateTime);
+            return date.toLocaleString('pt-BR');
+        }
+
+        function formatDate(date) {
+            if (!date) return '';
+            return new Date(date).toLocaleDateString('pt-BR');
+        }
+
+        function getTipoEmissaoDescription(tipo) {
+            const tipos = {
+                '1': 'Normal',
+                '2': 'Contingência FS',
+                '3': 'Contingência SCAN',
+                '4': 'Contingência DPEC',
+                '5': 'Contingência FS-DA',
+                '6': 'Contingência SVC-AN',
+                '7': 'Contingência SVC-RS',
+                '9': 'Contingência off-line NFC-e'
+            };
+            return tipos[tipo] || tipo;
+        }
+
+        function getTipoNFDescription(tipo) {
+            const tipos = {
+                '0': 'Entrada',
+                '1': 'Saída'
+            };
+            return tipos[tipo] || tipo;
+        }
+
+        function getFinalidadeDescription(finalidade) {
+            const finalidades = {
+                '1': 'NF-e normal',
+                '2': 'NF-e complementar',
+                '3': 'NF-e de ajuste',
+                '4': 'Devolução de mercadoria'
+            };
+            return finalidades[finalidade] || finalidade;
+        }
+
+        function getRegimeTributarioDescription(regime) {
+            const regimes = {
+                '1': 'Simples Nacional',
+                '2': 'Simples Nacional - excesso de sublimite de receita bruta',
+                '3': 'Regime Normal'
+            };
+            return regimes[regime] || regime;
+        }
+
+        function getModalidadeFreteDescription(modalidade) {
+            const modalidades = {
+                '0': 'Contratação do Frete por conta do Remetente (CIF)',
+                '1': 'Contratação do Frete por conta do Destinatário (FOB)',
+                '2': 'Contratação do Frete por conta de Terceiros',
+                '3': 'Transporte Próprio por conta do Remetente',
+                '4': 'Transporte Próprio por conta do Destinatário',
+                '9': 'Sem Ocorrência de Transporte'
+            };
+            return modalidades[modalidade] || modalidade;
+        }
+
+        function getFormaPagamentoDescription(forma) {
+            const formas = {
+                '01': 'Dinheiro',
+                '02': 'Cheque',
+                '03': 'Cartão de Crédito',
+                '04': 'Cartão de Débito',
+                '05': 'Crédito Loja',
+                '10': 'Vale Alimentação',
+                '11': 'Vale Refeição',
+                '12': 'Vale Presente',
+                '13': 'Vale Combustível',
+                '14': 'Duplicata Mercantil',
+                '15': 'Boleto Bancário',
+                '16': 'Depósito Bancário',
+                '17': 'Pagamento Instantâneo (PIX)',
+                '18': 'Transferência bancária',
+                '19': 'Programa de fidelidade',
+                '90': 'Sem pagamento',
+                '99': 'Outros'
+            };
+            return formas[forma] || forma;
+        }
+
+        function getModalDescription(modal) {
+            const modais = {
+                '01': 'Rodoviário',
+                '02': 'Aéreo',
+                '03': 'Aquaviário',
+                '04': 'Ferroviário',
+                '05': 'Dutoviário'
+            };
+            return modais[modal] || modal;
+        }
+
+        function getTipoServicoDescription(tipo) {
+            const tipos = {
+                '0': 'Normal',
+                '1': 'Subcontratação',
+                '2': 'Redespacho',
+                '3': 'Redespacho Intermediário',
+                '4': 'Serviço Vinculado a Multimodal'
+            };
+            return tipos[tipo] || tipo;
+        }
+
+        function getRetiraDescription(retira) {
+            const retiras = {
+                '0': 'Não',
+                '1': 'Sim'
+            };
+            return retiras[retira] || retira;
+        }
+
+        function showError(message) {
+            const contentDiv = document.getElementById('xmlContent');
+            contentDiv.style.display = 'block';
+            contentDiv.innerHTML = `<div class="error">${message}</div>`;
+        }
+    </script>
+</body>
+</html>
